@@ -30,7 +30,7 @@ activeTodoCounter.classList.add('todo-count')
 
 const clearCompletedButton = document.createElement('button')
 clearCompletedButton.classList.add('clear-completed')
-clearCompletedButton.addEventListener('click', () => clearCompleted())
+clearCompletedButton.addEventListener('click', clearCompleted)
 clearCompletedButton.textContent = 'Clear Completed'
 
 render()
@@ -186,7 +186,7 @@ function addTodo(event) {
   const id = +new Date()
 
   const newTodo = {
-    id: id,
+    id,
     title: newTodoTitle,
     completed: false,
   }
