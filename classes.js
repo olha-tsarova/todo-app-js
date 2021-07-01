@@ -154,7 +154,8 @@ class View {
     toggleAllInput.classList.add('toggle-all')
     this.todosActive.length === 0 ? toggleAllInput.setAttribute('checked', '') : ''
     toggleAllInput.addEventListener('click', (event) => {
-      this.controller.changeStatuses(event)
+      this.emitter.on('changeStatuses()', event)
+      // this.controller.changeStatuses(event)
       this.model.saveChanges(this.todos)
       // this.render()
     })
