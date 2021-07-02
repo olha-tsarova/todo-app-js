@@ -2,9 +2,20 @@
 
 let root = document.querySelector('.root')
 const rootParent = root.parentElement
-const filterButtons = [{id: 'all', title: 'All'}, {id: 'active', title: 'Active'}, {id: 'completed', title: 'Completed'}]
+
+const filter_completed = 'completed'
+const filter_active = 'active'
+const filter_all = 'all'
+const filterButtons = [{id: filter_all, title: 'All'}, {id: filter_active, title: 'Active'}, {id: filter_completed, title: 'Completed'}]
 
 let newTodoInput = document.querySelector('.new-todo')
+
+const CHANGE_STATUS_EVENT = 'change_status'
+const SET_STATUS_EVENT = 'set_status'
+const FILTER_TODOS_EVENT = 'filter_todos'
+const CLEAR_COMPLETED_EVENT = 'clear_completed'
+const ADD_TODO_EVENT = 'add_todo'
+const REMOVE_TODO_EVENT = 'remove_todo'
 
 class EventEmitter {
   constructor() {
@@ -24,7 +35,7 @@ class EventEmitter {
    * @param {string} eventName
    * @param {Function} callback
    */
-  unsubscribe(eventName, callback) {
+  off(eventName, callback) {
     this.events[eventName] = this.events[eventName].filter(eventCallback => callback !== eventCallback);
   }
 
@@ -41,7 +52,10 @@ class EventEmitter {
 class Model {
   constructor() {
     this.savedTodos = localStorage.todos ? this.getTodos() : []
-    this.filterBy = 'all'
+    this.filterBy = filter_all
+
+    this.todosActive = this.savedTodos.filter(todo => !todo.completed)
+    this.todosCompleted = this.savedTodos.filter(todo => todo.completed)
   }
 
   saveChanges(todos) {
@@ -51,73 +65,15 @@ class Model {
   getTodos() {
     return JSON.parse(localStorage.getItem('todos'))
   }
-
-  addTodo(event) {
-    const newTodoTitle = event.target.value.trim()
-
-    if (!newTodoTitle) {
-      return
-    }
-
-    const id = +new Date()
-
-    const newTodo = {
-      id,
-      title: newTodoTitle,
-      completed: false,
-    }
-
-    this.savedTodos.push(newTodo)
-    this.saveChanges(this.savedTodos)
-
-    event.target.value = ''
-  }
-
-  removeTodo(todoId) {
-    this.savedTodos = this.savedTodos.filter(todo => todo.id !== todoId)
-    this.saveChanges(this.savedTodos)
-  }
 }
 
 class View {
   constructor(modelObj, emitterObj) {
     this.model = modelObj
     this.emitter = emitterObj
-
-    this.todos = modelObj.savedTodos
-
-    this.todosActive = this.todos.filter(todo => !todo.completed)
-    this.todosCompleted = this.todos.filter(todo => todo.completed)
-  }
-
-  render() {
-    newTodoInput.addEventListener('keydown', (event) => {
-      if (event.key !== 'Enter') {
-        return
-      }
-
-      this.model.addTodo(event)
-
-      this.render()
-    })
-
-    if (!this.todos.length) {
-      return
-    }
-
-    root.remove()
-
-    root = document.createElement('div')
-    root.classList.add('root')
-    rootParent.append(root)
-
-    root.append(this.initMain())
-    root.append(this.initFooter())
   }
 
    initMain() {
-    console.log('init main');
-
     const mainSection = document.createElement('section')
     mainSection.classList.add('main')
     mainSection.append(this.initToggleAll())
@@ -127,17 +83,16 @@ class View {
   }
 
   initFooter() {
-    console.log('init footer');
-
-    const footerSection = document.createElement('footer')
+    let footerSection = null
+    footerSection = document.createElement('footer')
     footerSection.classList.add('footer')
     footerSection.append(this.initFilters(filterButtons))
 
-    if (this.todosActive.length) {
+    if (this.model.todosActive.length) {
       footerSection.append(this.initActiveTodosCounter())
     }
 
-    if (this.todosCompleted.length) {
+    if (this.model.todosCompleted.length) {
       footerSection.append(this.initClearCompletedButton())
     }
 
@@ -145,19 +100,15 @@ class View {
   }
 
   initToggleAll() {
-    console.log('init toggler');
-
     const toggleAllContainer = document.createElement('div')
     const toggleAllInput = document.createElement('input')
     toggleAllInput.setAttribute('id', 'toggle-all')
     toggleAllInput.setAttribute('type', 'checkbox')
     toggleAllInput.classList.add('toggle-all')
-    this.todosActive.length === 0 ? toggleAllInput.setAttribute('checked', '') : ''
-    toggleAllInput.addEventListener('click', (event) => {
-      this.emitter.on('changeStatuses()', event)
-      // this.controller.changeStatuses(event)
-      this.model.saveChanges(this.todos)
-      // this.render()
+    this.model.todosActive.length ? '' : toggleAllInput.setAttribute('checked', '')
+    toggleAllInput.addEventListener('click', () => {
+      this.emitter.emit(CHANGE_STATUS_EVENT, (event))
+      this.render()
     })
 
     const toggleAllLabel = document.createElement('label')
@@ -170,8 +121,6 @@ class View {
   }
 
   initFilters(filtersArr) {
-    console.log('init filters');
-
     const filtersList = document.createElement('ul')
     filtersList.classList.add('filters')
 
@@ -182,9 +131,9 @@ class View {
       filterButton.setAttribute('type', 'button')
       filterButton.setAttribute('id', `${button.id}`)
       filterButton.addEventListener('click', () => {
-        this.controller.filterTodos(button.id)
+        this.emitter.emit(FILTER_TODOS_EVENT, button.id)
 
-        // this.render()
+        this.render()
       })
 
       filterButton.textContent = `${button.title}`
@@ -198,9 +147,8 @@ class View {
   }
 
   initActiveTodosCounter() {
-    console.log('init counter');
-
-    const counterText = this.todosActive.length === 1 ? '1 item left' : `${this.todosActive.length} items left`
+    const counterText = this.model.todosActive.length === 1 ? '1 item left' : `${this.model.todosActive.length} items left`
+    console.log(counterText);
     const activeTodoCounter = document.createElement('span')
     activeTodoCounter.classList.add('todo-count')
     activeTodoCounter.textContent = counterText
@@ -209,14 +157,11 @@ class View {
   }
 
   initClearCompletedButton() {
-    console.log('init clear button');
-
     const clearCompletedButton = document.createElement('button')
     clearCompletedButton.classList.add('clear-completed')
     clearCompletedButton.addEventListener('click', () => {
-      this.controller.clearCompleted()
-
-      // this.render()
+      this.emitter.emit(CLEAR_COMPLETED_EVENT)
+      this.render()
     })
 
     clearCompletedButton.textContent = 'Clear Completed'
@@ -225,12 +170,24 @@ class View {
   }
 
   initTodos() {
-    console.log('init todo list');
+    let tasks
+
+    if (this.model.filterBy === filter_all) {
+      tasks = this.model.savedTodos
+    }
+
+    if (this.model.filterBy === filter_active) {
+      tasks = this.model.savedTodos.filter(todo => !todo.completed)
+    }
+
+    if (this.model.filterBy === filter_completed) {
+      tasks = this.model.savedTodos.filter(todo => todo.completed)
+    }
 
     const itemList = document.createElement('ul')
     itemList.classList.add('todo-list')
 
-    this.todos.map(todo => {
+    tasks.map(todo => {
       const todoItem = document.createElement('li')
       todoItem.classList.add('todo-item')
       todoItem.setAttribute('id', `${todo.id}`)
@@ -241,9 +198,8 @@ class View {
       todoInput.setAttribute('id', `todo-${todo.id}`)
       todoInput.setAttribute('type', 'checkbox')
       todoInput.addEventListener('click', () => {
-        this.controller.setStatus(todo.id)
-
-        // this.render()
+        this.emitter.emit(SET_STATUS_EVENT, todo.id)
+        this.render()
       })
 
       todo.completed ? todoInput.setAttribute('checked', '') : ''
@@ -255,18 +211,45 @@ class View {
       const todoButton = document.createElement('button')
       todoButton.classList.add('destroy')
       todoButton.addEventListener('click', () => {
-        this.model.removeTodo(todo.id)
-
-        // this.render()
+        this.emitter.emit(REMOVE_TODO_EVENT, todo.id)
+        this.render()
       })
 
       todoItem.append(todoInput)
       todoItem.append(todoLabel)
       todoItem.append(todoButton)
-      itemList.append(todoItem)
+      itemList.prepend(todoItem)
     })
 
     return itemList
+  }
+
+  addTodoHandler = (event) => {
+    if (event.key !== 'Enter') {
+      return
+    }
+
+    this.emitter.emit(ADD_TODO_EVENT, event.target.value)
+
+    event.target.value = ''
+    this.render()
+  }
+
+  render() {
+    newTodoInput.addEventListener('keydown', this.addTodoHandler)
+
+    if (!this.model.savedTodos.length) {
+      return
+    }
+
+    root.remove()
+
+    root = document.createElement('div')
+    root.classList.add('root')
+    rootParent.append(root)
+
+    root.append(this.initMain())
+    root.append(this.initFooter())
   }
 }
 
@@ -274,24 +257,54 @@ class Controller {
   constructor(viewObj) {
     this.view = viewObj
 
-    this.todosToRender = this.view.todos
+    this.view.emitter.on(FILTER_TODOS_EVENT, (button) => this.filterTodos(button))
+    this.view.emitter.on(CLEAR_COMPLETED_EVENT, () => this.clearCompleted())
+    this.view.emitter.on(SET_STATUS_EVENT, (todo) => this.setStatus(todo))
+    this.view.emitter.on(CHANGE_STATUS_EVENT, (event) => this.changeStatuses(event))
+    this.view.emitter.on(ADD_TODO_EVENT, (value) => this.addTodo(value))
+    this.view.emitter.on(REMOVE_TODO_EVENT, (id) => this.removeTodo(id))
+  }
+
+  addTodo(title) {
+    const newTodoTitle = title.trim()
+
+    if (!newTodoTitle) {
+      return
+    }
+
+    const id = +new Date()
+
+    const newTodo = {
+      id,
+      title: newTodoTitle,
+      completed: false,
+    }
+
+    this.view.model.savedTodos.push(newTodo)
+    this.view.model.saveChanges(this.view.model.savedTodos)
+  }
+
+  removeTodo(todoId) {
+    this.view.model.savedTodos = this.view.model.savedTodos.filter(todo => todo.id !== todoId)
+    this.view.model.saveChanges(this.view.model.savedTodos)
   }
 
   filterTodos(buttonId) {
     switch(buttonId) {
-      case 'all':
-        this.filterBy  = 'all'
-        this.todosToRender = this.view.todos
+      case filter_all:
+        this.view.model.filterBy  = filter_all
+        this.view.render()
         break
 
-      case 'active':
-        this.filterBy  = 'active'
-        this.todosToRender = this.todosToRender.filter(todo => !todo.completed)
+      case filter_active:
+        this.view.model.filterBy  = filter_active
+        this.view.render()
+
         break
 
-      case 'completed':
-        this.filterBy  = 'completed'
-        this.todosToRender = this.todosToRender.filter(todo => todo.completed)
+      case filter_completed:
+        this.view.model.filterBy  = filter_completed
+        this.view.render()
         break
 
       default:
@@ -300,19 +313,23 @@ class Controller {
   }
 
   clearCompleted() {
-    this.todosToRender = this.todosToRender.filter(todo => !todo.completed)
-    // this.model.saveChanges()
+    this.view.model.saveChanges(this.view.model.savedTodos.filter(todo => !todo.completed))
+    this.view.render()
   }
 
   setStatus(todoId) {
-    const checkedTodo = this.savedTodos.find(todo => todo.id === todoId)
-
+    const checkedTodo = this.view.model.savedTodos.find(todo => todo.id === todoId)
     checkedTodo.completed = !checkedTodo.completed
-    // this.model.saveChanges()
+    this.view.model.saveChanges(this.view.model.savedTodos)
+
+    this.view.render()
   }
 
   changeStatuses(event) {
-    this.todosToRender.map(todo => todo.completed = event.target.checked)
+    this.view.model.savedTodos.map(todo => todo.completed = event.target.checked)
+    this.view.model.saveChanges(this.view.model.savedTodos)
+
+    this.view.render()
   }
 }
 
