@@ -53,9 +53,18 @@ class Model {
   constructor() {
     this.savedTodos = localStorage.todos ? this.getTodos() : []
     this.filterBy = filter_all
+  }
 
-    this.todosActive = this.savedTodos.filter(todo => !todo.completed)
-    this.todosCompleted = this.savedTodos.filter(todo => todo.completed)
+  todosActive() {
+    if (this.savedTodos.length) {
+      return this.savedTodos.filter(todo => !todo.completed)
+    }
+  }
+
+  todosCompleted() {
+    if (this.savedTodos.length) {
+      return this.savedTodos.filter(todo => todo.completed)
+    }
   }
 
   saveChanges(todos) {
@@ -83,16 +92,15 @@ class View {
   }
 
   initFooter() {
-    let footerSection = null
-    footerSection = document.createElement('footer')
+    const footerSection = document.createElement('footer')
     footerSection.classList.add('footer')
     footerSection.append(this.initFilters(filterButtons))
 
-    if (this.model.todosActive.length) {
+    if (this.model.todosActive().length) {
       footerSection.append(this.initActiveTodosCounter())
     }
 
-    if (this.model.todosCompleted.length) {
+    if (this.model.todosCompleted().length) {
       footerSection.append(this.initClearCompletedButton())
     }
 
@@ -105,9 +113,9 @@ class View {
     toggleAllInput.setAttribute('id', 'toggle-all')
     toggleAllInput.setAttribute('type', 'checkbox')
     toggleAllInput.classList.add('toggle-all')
-    this.model.todosActive.length ? '' : toggleAllInput.setAttribute('checked', '')
-    toggleAllInput.addEventListener('click', () => {
-      this.emitter.emit(CHANGE_STATUS_EVENT, (event))
+    this.model.todosActive().length === 0 ? '' : toggleAllInput.setAttribute('checked', '')
+    toggleAllInput.addEventListener('click', (event) => {
+      this.emitter.emit(CHANGE_STATUS_EVENT, (event.target.checked))
       this.render()
     })
 
@@ -132,7 +140,6 @@ class View {
       filterButton.setAttribute('id', `${button.id}`)
       filterButton.addEventListener('click', () => {
         this.emitter.emit(FILTER_TODOS_EVENT, button.id)
-
         this.render()
       })
 
@@ -147,7 +154,7 @@ class View {
   }
 
   initActiveTodosCounter() {
-    const counterText = this.model.todosActive.length === 1 ? '1 item left' : `${this.model.todosActive.length} items left`
+    const counterText = this.model.todosActive().length === 1 ? '1 item left' : `${this.model.todosActive().length} items left`
     console.log(counterText);
     const activeTodoCounter = document.createElement('span')
     activeTodoCounter.classList.add('todo-count')
@@ -260,7 +267,7 @@ class Controller {
     this.view.emitter.on(FILTER_TODOS_EVENT, (button) => this.filterTodos(button))
     this.view.emitter.on(CLEAR_COMPLETED_EVENT, () => this.clearCompleted())
     this.view.emitter.on(SET_STATUS_EVENT, (todo) => this.setStatus(todo))
-    this.view.emitter.on(CHANGE_STATUS_EVENT, (event) => this.changeStatuses(event))
+    this.view.emitter.on(CHANGE_STATUS_EVENT, (bool) => this.changeStatuses(bool))
     this.view.emitter.on(ADD_TODO_EVENT, (value) => this.addTodo(value))
     this.view.emitter.on(REMOVE_TODO_EVENT, (id) => this.removeTodo(id))
   }
@@ -313,23 +320,25 @@ class Controller {
   }
 
   clearCompleted() {
-    this.view.model.saveChanges(this.view.model.savedTodos.filter(todo => !todo.completed))
-    this.view.render()
+    this.view.model.savedTodos = this.view.model.savedTodos.filter(todo => !todo.completed)
+    this.view.model.saveChanges(this.view.model.savedTodos)
   }
 
   setStatus(todoId) {
     const checkedTodo = this.view.model.savedTodos.find(todo => todo.id === todoId)
     checkedTodo.completed = !checkedTodo.completed
     this.view.model.saveChanges(this.view.model.savedTodos)
-
-    this.view.render()
   }
 
-  changeStatuses(event) {
-    this.view.model.savedTodos.map(todo => todo.completed = event.target.checked)
-    this.view.model.saveChanges(this.view.model.savedTodos)
+  changeStatuses(checked) {
+    console.log(checked)
 
-    this.view.render()
+    this.view.model.savedTodos = this.view.model.savedTodos.map(todo => {
+      console.log(todo)
+      todo.completed = !checked
+      console.log(todo)
+    })
+    this.view.model.saveChanges(this.view.model.savedTodos)
   }
 }
 
@@ -338,4 +347,4 @@ const emitter = new EventEmitter()
 const view = new View(model, emitter)
 const controller = new Controller(view)
 
-view.render()
+controller.view.render()
