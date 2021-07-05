@@ -63,7 +63,6 @@ class Model {
   }
 
   saveChanges(tasks) {
-    console.log(tasks);
     localStorage.setItem('todos', JSON.stringify(tasks))
   }
 
@@ -151,7 +150,6 @@ class View {
 
   initActiveTodosCounter() {
     const counterText = this.model.getTodosActive().length === 1 ? '1 item left' : `${this.model.getTodosActive().length} items left`
-    console.log(counterText);
     const activeTodoCounter = document.createElement('span')
     activeTodoCounter.classList.add('todo-count')
     activeTodoCounter.textContent = counterText
@@ -292,9 +290,7 @@ class Controller {
 
   removeTodo(todoId) {
     let savedTodos = this.model.getTodos()
-    console.log(savedTodos);
     savedTodos = savedTodos.filter(todo => todo.id !== todoId)
-    console.log(savedTodos);
     this.model.saveChanges(savedTodos)
   }
 
@@ -330,8 +326,6 @@ class Controller {
   }
 
   changeStatuses(checked) {
-    console.log(checked)
-
     let savedTodos = this.model.getTodos()
 
     let changedTodos = savedTodos.map(todo => ({
@@ -348,4 +342,4 @@ const emitter = new EventEmitter()
 const view = new View(model, emitter)
 const controller = new Controller(view, model, emitter)
 
-controller.view.render()
+view.render()
