@@ -20,5 +20,8 @@
   "bugs": {
     "url": "https://github.com/olha-tsarova/todo-app-js/issues"
   },
-  "homepage": "https://github.com/olha-tsarova/todo-app-js#readme"
+  "homepage": "https://github.com/olha-tsarova/todo-app-js#readme",
+  "dependencies": {
+    "nodemon": "^2.0.9"
+  }
 }

@@ -7,9 +7,32 @@ let todos = [{
 }]
 
 const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'})
-  res.write(JSON.stringify(todos))
-  res.end()
+  const { headers, method, url } = req
+
+  console.log(`method: ${method} url: ${url}`);
+  res.statusCode = 200
+  res.setHeader('Content-Type', 'application/json')
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8')
+
+  if (method === 'GET' && url === '/todos') {
+    res.end(JSON.stringify(todos));
+  }
+
+  if (method === 'POST' && url === '/todos') {
+    req.on('data', chunk => {
+      console.log(`Data chunk available: ${chunk}`)
+      todos = todos.concat(JSON.parse(chunk))
+    })
+    res.end(JSON.stringify(todos))
+  }
+
+  res.on('error', (err) => {
+    console.error(err);
+  })
+
+  res.end('')
 })
 
 server.listen(5050)
