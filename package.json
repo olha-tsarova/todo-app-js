@@ -22,6 +22,7 @@
   },
   "homepage": "https://github.com/olha-tsarova/todo-app-js#readme",
   "dependencies": {
+    "mongoose": "^5.13.2",
     "nodemon": "^2.0.9"
   }
 }
