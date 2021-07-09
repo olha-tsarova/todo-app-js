@@ -1,4 +1,35 @@
 'use strict'
+// import { queryToServer, getTodosFromServer } from "./api.js";
+const API_URL = 'http://127.0.0.1:5050'
+const GET_TODOS_URL = '/todos'
+const ADD_TODO = '/addtodo'
+const DELETE_TODOS_URL = '/delete'
+const EDIT_TODOS_URL = '/edit'
+const CHANGE_STATUSES_URL = '/changestatuses'
+
+const M_POST = 'POST'
+const M_GET = 'GET'
+const M_PATCH = 'PATCH'
+const M_DELETE = 'DELETE'
+
+function getTodosFromServer(url, options) {
+  return fetch(`${url}${options}`)
+    .then(response => response.json())
+    .then(res => {
+      return res
+    })
+}
+
+function queryToServer(url, options, method, data) {
+  return fetch(`${url}${options}`, {
+    method: method,
+    body: JSON.stringify(data),
+    headers: {
+      "Content-type": "application/json",
+    }
+  })
+      .then(response => console.log(response))
+}
 
 let root = document.querySelector('.root')
 const rootParent = root.parentElement
@@ -52,22 +83,39 @@ class EventEmitter {
 class Model {
   constructor() {
     this.filterBy = filter_all
+    this.todos = []
+  }
+
+ async loadTodos() {
+  await getTodosFromServer(API_URL, GET_TODOS_URL).then(result => {
+    this.todos = result
+  })
+
   }
 
   getTodosActive() {
-    return this.getTodos().filter(todo => !todo.completed)
+    console.log(this.todos)
+    return this.todos.filter(todo => !todo.completed)
   }
 
   getTodosCompleted() {
-    return this.getTodos().filter(todo => todo.completed)
+    return this.todos.filter(todo => todo.completed)
   }
 
   saveChanges(tasks) {
     localStorage.setItem('todos', JSON.stringify(tasks))
   }
 
-  getTodos() {
-    return localStorage.todos ? JSON.parse(localStorage.getItem('todos')) : []
+  async getTodos() {
+    // return localStorage.todos ? JSON.parse(localStorage.getItem('todos')) : []
+  //   getTodosFromServer(API_URL, GET_TODOS_URL)
+  //     .then(response => {
+  //       return response
+  //     })
+  //     .catch(err => console.warn(err))
+    await getTodosFromServer(API_URL, GET_TODOS_URL).then(result => {
+      return result
+    })
   }
 }
 
@@ -172,9 +220,9 @@ class View {
 
   initTodos() {
     let tasks
-
     if (this.model.filterBy === filter_all) {
-      tasks = this.model.getTodos()
+      tasks = this.model.todos
+      console.log(tasks);
     }
 
     if (this.model.filterBy === filter_active) {
@@ -191,28 +239,28 @@ class View {
     tasks.map(todo => {
       const todoItem = document.createElement('li')
       todoItem.classList.add('todo-item')
-      todoItem.setAttribute('id', `${todo.id}`)
+      todoItem.setAttribute('id', `${todo._id}`)
       todo.completed ? todoItem.classList.add('completed') : ''
 
       const todoInput = document.createElement('input')
       todoInput.classList.add('toggle')
-      todoInput.setAttribute('id', `todo-${todo.id}`)
+      todoInput.setAttribute('id', `todo-${todo._id}`)
       todoInput.setAttribute('type', 'checkbox')
       todoInput.addEventListener('click', () => {
-        this.emitter.emit(SET_STATUS_EVENT, todo.id)
+        this.emitter.emit(SET_STATUS_EVENT, todo._id)
         this.render()
       })
 
       todo.completed ? todoInput.setAttribute('checked', '') : ''
 
       const todoLabel = document.createElement('label')
-      todoLabel.setAttribute('for', `todo-${todo.id}`)
+      todoLabel.setAttribute('for', `todo-${todo._id}`)
       todoLabel.textContent = `${todo.title}`
 
       const todoButton = document.createElement('button')
       todoButton.classList.add('destroy')
       todoButton.addEventListener('click', () => {
-        this.emitter.emit(REMOVE_TODO_EVENT, todo.id)
+        this.emitter.emit(REMOVE_TODO_EVENT, todo._id)
         this.render()
       })
 
@@ -225,6 +273,8 @@ class View {
     return itemList
   }
 
+
+
   addTodoHandler = (event) => {
     if (event.key !== 'Enter') {
       return
@@ -236,20 +286,27 @@ class View {
     this.render()
   }
 
-  render() {
+  async render() {
+    debugger
+    await this.model.loadTodos().then(res => {
+      if (!this.model.todos.length) {
+        return
+      }
+    })
+
     newTodoInput.addEventListener('keydown', this.addTodoHandler)
 
     root.remove()
 
-    if (!this.model.getTodos().length) {
+    if (!this.model.todos.length) {
       return
     }
 
-    root = document.createElement('div')
-    root.classList.add('root')
-    rootParent.append(root)
+    root = document.createElement('div'),
+    root.classList.add('root'),
+    rootParent.append(root),
 
-    root.append(this.initMain())
+    root.append(this.initMain()),
     root.append(this.initFooter())
   }
 }
@@ -270,7 +327,7 @@ class Controller {
 
   addTodo(title) {
     const newTodoTitle = title.trim()
-    let savedTodos = this.model.getTodos()
+    let savedTodos = this.model.todos
 
     if (!newTodoTitle) {
       return
@@ -289,7 +346,7 @@ class Controller {
   }
 
   removeTodo(todoId) {
-    let savedTodos = this.model.getTodos()
+    let savedTodos = this.model.todos
     savedTodos = savedTodos.filter(todo => todo.id !== todoId)
     this.model.saveChanges(savedTodos)
   }
@@ -319,14 +376,14 @@ class Controller {
   }
 
   setStatus(todoId) {
-    let savedTodos = this.model.getTodos()
+    let savedTodos = this.model.todos
     const checkedTodo = savedTodos.find(todo => todo.id === todoId)
     checkedTodo.completed = !checkedTodo.completed
     this.model.saveChanges(savedTodos)
   }
 
   changeStatuses(checked) {
-    let savedTodos = this.model.getTodos()
+    let savedTodos = this.model.todos
 
     let changedTodos = savedTodos.map(todo => ({
       ...todo,

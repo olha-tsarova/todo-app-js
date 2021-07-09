@@ -36,10 +36,10 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (method === 'POST' && url === '/addtodo') {
-    req.on('data', chunk => {
+    req.on('data', async chunk => {
       const data = JSON.parse(chunk)
       const newTodo = new Todo(data)
-      newTodo.save((err, newTodo) => {
+      await newTodo.save((err, newTodo) => {
         if (err) {
           console.error(err)
           res.end(err)
@@ -50,38 +50,38 @@ const server = http.createServer(async (req, res) => {
     res.end('added to list')
   }
 
-  if (method === 'DELETE') {
-    req.on('data', chunk => {
-      const data = JSON.parse(chunk)
-      data.forEach(element => {
-        Todo.deleteOne({ _id: element._id }, function(err) {
-          if (err) {
-            console.error(err)
-            res.end(err)
-          }
-        })
-      });
+  if (method === 'DELETE' && url === '/delete') {
+    req.on('data', async chunk => {
+      const ids = JSON.parse(chunk)
+
+      const result = await Todo.deleteMany({ _id: { $in: ids } })
+
+      console.log('result ++ ', result);
     })
 
     res.end('deleted from list')
   }
 
-  if (method === 'PATCH') {
-    req.on('data', chunk => {
+  if (method === 'PATCH' && url === '/changestatuses') {
+    req.on('data', async chunk => {
       const data = JSON.parse(chunk)
-      data.forEach(element => {
-        Todo.findByIdAndUpdate({ _id: element._id }, { title: element.title, completed: element.completed }, {new: true}, (err, dat) => {
-          if (err) {
-            console.error(err)
-            res.end(err)
-          } else {
-            console.log(dat);
-          }
-        })
-      })
 
-      res.end('updated')
+      console.log(data);
+
+      const result = await Todo.updateMany({ _id: { $in: data.ids}}, { completed: data.data.completed })
     })
+
+    res.end('statuses updated')
+  }
+
+  if (method === 'PATCH' && url === '/edit') {
+    req.on('data', async chunk => {
+      const data = JSON.parse(chunk)
+
+      const result = await Todo.findByIdAndUpdate({ _id: data._id }, { title: data.title, completed: data.completed }, {new: true})
+    })
+
+    res.end('title updated')
   }
 })
 
