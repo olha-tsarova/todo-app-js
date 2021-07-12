@@ -2,13 +2,13 @@
 // import { queryToServer, getTodosFromServer } from "./api.js";
 const API_URL = 'http://127.0.0.1:5050'
 const GET_TODOS_URL = '/todos'
-const ADD_TODO = '/addtodo'
+const ADD_TODO_URL = '/addtodo'
 const DELETE_TODOS_URL = '/delete'
-const EDIT_TODOS_URL = '/edit'
+const EDIT_TODO_URL = '/edit'
 const CHANGE_STATUSES_URL = '/changestatuses'
 
-const M_POST = 'POST'
 const M_GET = 'GET'
+const M_POST = 'POST'
 const M_PATCH = 'PATCH'
 const M_DELETE = 'DELETE'
 
@@ -21,14 +21,18 @@ function getTodosFromServer(url, options) {
 }
 
 function queryToServer(url, options, method, data) {
+  console.log(`API: ${url}, OPTION: ${options}, data: ${data}`)
   return fetch(`${url}${options}`, {
     method: method,
-    body: JSON.stringify(data),
     headers: {
       "Content-type": "application/json",
-    }
+    },
+    body: JSON.stringify(data)
   })
-      .then(response => console.log(response))
+    .then(response => {
+      console.log(response.ok)
+      return response.ok
+    })
 }
 
 let root = document.querySelector('.root')
@@ -87,14 +91,16 @@ class Model {
   }
 
  async loadTodos() {
-  await getTodosFromServer(API_URL, GET_TODOS_URL).then(result => {
-    this.todos = result
-  })
+    const newTodos = await getTodosFromServer(API_URL, GET_TODOS_URL)
 
+    this.todos = newTodos
+  }
+
+  async setTodo(data) {
+    await queryToServer(API_URL, ADD_TODO_URL, M_POST, data)
   }
 
   getTodosActive() {
-    console.log(this.todos)
     return this.todos.filter(todo => !todo.completed)
   }
 
@@ -102,21 +108,33 @@ class Model {
     return this.todos.filter(todo => todo.completed)
   }
 
-  saveChanges(tasks) {
-    localStorage.setItem('todos', JSON.stringify(tasks))
+  async deleteTodos(data) {
+    await queryToServer(API_URL, DELETE_TODOS_URL, M_DELETE, data)
   }
 
-  async getTodos() {
-    // return localStorage.todos ? JSON.parse(localStorage.getItem('todos')) : []
-  //   getTodosFromServer(API_URL, GET_TODOS_URL)
-  //     .then(response => {
-  //       return response
-  //     })
-  //     .catch(err => console.warn(err))
-    await getTodosFromServer(API_URL, GET_TODOS_URL).then(result => {
-      return result
-    })
+  async changeTodo(data) {
+    await queryToServer(API_URL, EDIT_TODO_URL, M_PATCH, data)
   }
+
+  async changeTodos(data) {
+    await queryToServer(API_URL, CHANGE_STATUSES_URL, M_PATCH, data)
+  }
+
+  // saveChanges(tasks) {
+  //   localStorage.setItem('todos', JSON.stringify(tasks))
+  // }
+
+//   async getTodos() {
+//     // return localStorage.todos ? JSON.parse(localStorage.getItem('todos')) : []
+//   //   getTodosFromServer(API_URL, GET_TODOS_URL)
+//   //     .then(response => {
+//   //       return response
+//   //     })
+//   //     .catch(err => console.warn(err))
+//     await getTodosFromServer(API_URL, GET_TODOS_URL).then(result => {
+//       return result
+//     })
+//   }
 }
 
 class View {
@@ -159,7 +177,6 @@ class View {
     this.model.getTodosActive().length === 0 ? toggleAllInput.setAttribute('checked', '') : ''
     toggleAllInput.addEventListener('click', (event) => {
       this.emitter.emit(CHANGE_STATUS_EVENT, (event.target.checked))
-      this.render()
     })
 
     const toggleAllLabel = document.createElement('label')
@@ -210,7 +227,6 @@ class View {
     clearCompletedButton.classList.add('clear-completed')
     clearCompletedButton.addEventListener('click', () => {
       this.emitter.emit(CLEAR_COMPLETED_EVENT)
-      this.render()
     })
 
     clearCompletedButton.textContent = 'Clear Completed'
@@ -222,7 +238,6 @@ class View {
     let tasks
     if (this.model.filterBy === filter_all) {
       tasks = this.model.todos
-      console.log(tasks);
     }
 
     if (this.model.filterBy === filter_active) {
@@ -248,7 +263,6 @@ class View {
       todoInput.setAttribute('type', 'checkbox')
       todoInput.addEventListener('click', () => {
         this.emitter.emit(SET_STATUS_EVENT, todo._id)
-        this.render()
       })
 
       todo.completed ? todoInput.setAttribute('checked', '') : ''
@@ -261,7 +275,6 @@ class View {
       todoButton.classList.add('destroy')
       todoButton.addEventListener('click', () => {
         this.emitter.emit(REMOVE_TODO_EVENT, todo._id)
-        this.render()
       })
 
       todoItem.append(todoInput)
@@ -272,8 +285,6 @@ class View {
 
     return itemList
   }
-
-
 
   addTodoHandler = (event) => {
     if (event.key !== 'Enter') {
@@ -287,12 +298,7 @@ class View {
   }
 
   async render() {
-    debugger
-    await this.model.loadTodos().then(res => {
-      if (!this.model.todos.length) {
-        return
-      }
-    })
+    await this.model.loadTodos()
 
     newTodoInput.addEventListener('keydown', this.addTodoHandler)
 
@@ -327,28 +333,21 @@ class Controller {
 
   addTodo(title) {
     const newTodoTitle = title.trim()
-    let savedTodos = this.model.todos
 
     if (!newTodoTitle) {
       return
     }
 
-    const id = +new Date()
-
     const newTodo = {
-      id,
       title: newTodoTitle,
-      completed: false,
     }
 
-    savedTodos = [...savedTodos, newTodo]
-    this.model.saveChanges(savedTodos)
+    this.model.setTodo(newTodo)
   }
 
-  removeTodo(todoId) {
-    let savedTodos = this.model.todos
-    savedTodos = savedTodos.filter(todo => todo.id !== todoId)
-    this.model.saveChanges(savedTodos)
+  async removeTodo(todoId) {
+    await this.model.deleteTodos([todoId])
+    this.view.render()
   }
 
   filterTodos(buttonId) {
@@ -370,27 +369,34 @@ class Controller {
     }
   }
 
-  clearCompleted() {
-    const activeTodos = this.model.getTodosActive()
-    this.model.saveChanges(activeTodos)
+  async clearCompleted() {
+    const completedTodos = this.model.getTodosCompleted()
+    const completedTodosIds = []
+    completedTodos.forEach(todo => completedTodosIds.push(todo._id))
+
+    await this.model.deleteTodos(completedTodosIds)
+    this.view.render()
   }
 
-  setStatus(todoId) {
+  async setStatus(todoId) {
     let savedTodos = this.model.todos
-    const checkedTodo = savedTodos.find(todo => todo.id === todoId)
+    const checkedTodo = savedTodos.find(todo => todo._id === todoId)
     checkedTodo.completed = !checkedTodo.completed
-    this.model.saveChanges(savedTodos)
+    await this.model.changeTodo(checkedTodo)
+    this.view.render()
   }
 
-  changeStatuses(checked) {
+  async changeStatuses(checked) {
     let savedTodos = this.model.todos
+    const changedTodosData = {ids: [], data: {completed: checked}}
+    // let changedTodos = savedTodos.map(todo => ({
+    //   ...todo,
+    //   completed: checked,
+    // }))
+    savedTodos.forEach(todo => changedTodosData.ids.push(todo._id))
 
-    let changedTodos = savedTodos.map(todo => ({
-      ...todo,
-      completed: checked,
-    }))
-
-    this.model.saveChanges(changedTodos)
+    await this.model.changeTodos(changedTodosData)
+    this.view.render()
   }
 }
 

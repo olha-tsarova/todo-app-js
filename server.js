@@ -23,8 +23,8 @@ const server = http.createServer(async (req, res) => {
   const { method, url } = req
   console.log(`method: ${method} url: ${url}`)
 
-  res.statusCode = 200
   res.setHeader('Content-Type', 'application/json')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS, DELETE, PATCH')
 
@@ -78,10 +78,15 @@ const server = http.createServer(async (req, res) => {
     req.on('data', async chunk => {
       const data = JSON.parse(chunk)
 
-      const result = await Todo.findByIdAndUpdate({ _id: data._id }, { title: data.title, completed: data.completed }, {new: true})
+      const result = await Todo.findOneAndUpdate({ _id: data._id }, { title: data.title, completed: data.completed }, {new: true})
     })
 
     res.end('title updated')
+  }
+
+  if (method === 'OPTIONS') {
+    res.statusCode = 204
+    res.end()
   }
 })
 
